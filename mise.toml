@@ -1,0 +1,42 @@
+[tools]
+# Provides `cargo upgrade` for bumping version requirements in Cargo.toml
+"cargo:cargo-edit" = "latest"
+
+[tasks.update]
+description = "Upgrade dependencies in Cargo.toml and refresh Cargo.lock"
+run = [
+  "cargo upgrade --incompatible",
+  "cargo update",
+]
+
+[tasks.fmt]
+description = "Format sources with rustfmt"
+run = "cargo fmt"
+sources = ["src/**/*.rs"]
+outputs = { auto = true }
+
+[tasks.test]
+description = "Run the test suite"
+# Format first so tests never compile sources that rustfmt is rewriting
+depends = ["fmt"]
+run = "cargo test"
+sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
+outputs = { auto = true }
+
+[tasks.build]
+description = "Build a release binary"
+depends = ["fmt", "test"]
+# cargo resets the binary's mtime (no-op builds, `cargo install` re-linking it), so track a stamp file instead
+run = ["cargo build --release", "touch target/release/.mise-build-stamp"]
+sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
+outputs = ["target/release/.mise-build-stamp"]
+
+[tasks.install]
+description = "Install typst-updater into ~/.cargo/bin"
+depends = ["build"]
+run = [
+  "cargo install --path . --locked",
+  "touch {{env.HOME}}/.cargo/bin/typst-updater",
+]
+sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
+outputs = ["{{env.HOME}}/.cargo/bin/typst-updater"]
