@@ -1,6 +1,8 @@
 [tools]
 # Provides `cargo upgrade` for bumping version requirements in Cargo.toml
 "cargo:cargo-edit" = "latest"
+# Provides `sbot` for deriving release and snapshot versions from git tags
+"github:restechnica/semverbot" = "1.7.2"
 
 [tasks.update]
 description = "Upgrade dependencies in Cargo.toml and refresh Cargo.lock"
@@ -40,3 +42,18 @@ run = [
 ]
 sources = ["Cargo.toml", "Cargo.lock", "src/**/*.rs"]
 outputs = ["{{env.HOME}}/.cargo/bin/typst-updater"]
+
+[tasks.version]
+description = "Print the current released version and the predicted next version"
+run = [
+  "echo current: $(sbot get version)",
+  "echo next:    $(sbot predict version)",
+]
+
+[tasks.release]
+description = "Tag the predicted next version and push the tag, triggering a release build"
+depends = ["test"]
+run = [
+  "sbot release version",
+  "sbot push version",
+]
