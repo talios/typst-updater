@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -13,6 +14,7 @@ use serde::Deserialize;
 use walkdir::{DirEntry, WalkDir};
 
 const PACKAGE_INDEX_URL: &str = "https://packages.typst.org/preview/index.json";
+const INDEX_TIMEOUT: Duration = Duration::from_secs(30);
 
 static IMPORT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"\bimport\s+"@preview/([A-Za-z0-9_-]+):([0-9]+\.[0-9]+\.[0-9]+)""#)
@@ -153,7 +155,12 @@ fn is_hidden(entry: &DirEntry) -> bool {
 
 /// Returns the highest published version of every package in the preview namespace.
 fn fetch_latest_versions(url: &str) -> Result<HashMap<String, Version>> {
-    let entries: Vec<IndexEntry> = ureq::get(url)
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(INDEX_TIMEOUT))
+        .build()
+        .into();
+    let entries: Vec<IndexEntry> = agent
+        .get(url)
         .call()
         .context("failed to fetch Typst package index")?
         .body_mut()
