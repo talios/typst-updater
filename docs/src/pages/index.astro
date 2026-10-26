@@ -100,7 +100,8 @@ const tree = fileTree("my-thesis", walk.files, walk.paths);
           <h3>Edits stay surgical</h3>
           <p>
             Only the version text inside each import string is replaced. Formatting, comments and everything else in
-            the file are left exactly as they were.
+            the file are left exactly as they were, and a file you edit while the prompt is open is skipped rather than
+            overwritten.
           </p>
         </div>
       </div>

@@ -114,13 +114,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    let mut updated_files = 0;
+    let mut updated_imports = 0;
     for file in &pending {
-        apply_updates(file)?;
+        if apply_updates(file)? {
+            updated_files += 1;
+            updated_imports += file.updates.len();
+        }
     }
     println!(
-        "\n{} {total} import(s) across {} file(s).",
+        "\n{} {updated_imports} import(s) across {updated_files} file(s).",
         "Updated".green().bold(),
-        pending.len()
     );
     Ok(())
 }
@@ -251,8 +255,19 @@ fn rewrite(contents: &str, updates: &[Update]) -> String {
     contents
 }
 
-fn apply_updates(file: &FileUpdates) -> Result<()> {
-    fs::write(&file.path, rewrite(&file.contents, &file.updates))
+/// Writes `file`'s updates, returning `false` without touching it if it changed since it was scanned.
+fn apply_updates(file: &FileUpdates) -> Result<bool> {
+    let current = fs::read_to_string(&file.path)
+        .with_context(|| format!("failed to re-read {}", file.path.display()))?;
+    if current != file.contents {
+        println!(
+            "\n  {} {} changed since it was scanned; skipped",
+            "!".yellow(),
+            file.display.bold()
+        );
+        return Ok(false);
+    }
+    write_atomically(&file.path, &rewrite(&file.contents, &file.updates))
         .with_context(|| format!("failed to write {}", file.path.display()))?;
 
     println!("\n  {} {}", "✔".green(), file.display.bold());
@@ -262,6 +277,21 @@ fn apply_updates(file: &FileUpdates) -> Result<()> {
             update.import.line, update.import.package, update.import.current, update.latest,
         );
     }
+    Ok(true)
+}
+
+/// Replaces `path` through a temporary file in the same directory, so a failed write
+/// never leaves it truncated. The file keeps its permissions.
+fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {
+    let dir = path
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(dir)?;
+    temp.write_all(contents.as_bytes())?;
+    temp.as_file()
+        .set_permissions(fs::metadata(path)?.permissions())?;
+    temp.persist(path)?;
     Ok(())
 }
 
@@ -367,6 +397,50 @@ mod tests {
                 "// keep this\n",
                 "#import \"@preview/tablex:0.0.9\"\n",
             )
+        );
+    }
+
+    fn pending(path: PathBuf, contents: &str) -> FileUpdates {
+        let index = latest(&[("cetz", "0.2.0")]);
+        FileUpdates {
+            path,
+            display: "main.typ".into(),
+            contents: contents.into(),
+            updates: find_updates(contents, &index),
+        }
+    }
+
+    #[test]
+    fn apply_updates_skips_files_changed_since_the_scan() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("main.typ");
+        let scanned = "#import \"@preview/cetz:0.1.0\"\n";
+        let edited = "#import \"@preview/cetz:0.1.0\"\n= New heading\n";
+        fs::write(&path, edited).unwrap();
+
+        assert!(!apply_updates(&pending(path.clone(), scanned)).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), edited);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn apply_updates_rewrites_in_place_keeping_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("main.typ");
+        let src = "#import \"@preview/cetz:0.1.0\"\n";
+        fs::write(&path, src).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        assert!(apply_updates(&pending(path.clone(), src)).unwrap());
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "#import \"@preview/cetz:0.2.0\"\n"
+        );
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o644
         );
     }
 
