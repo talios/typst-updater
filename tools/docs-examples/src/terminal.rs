@@ -29,7 +29,7 @@ const INDEX_TEST: &str = "rewrite_changes_only_versions_and_handles_length_chang
 const PROJECT: &str = "my-thesis";
 
 #[derive(Serialize)]
-pub struct Terminals {
+pub(crate) struct Terminals {
     help: Session,
     run: Session,
 }
@@ -49,7 +49,7 @@ struct Span {
     styles: Vec<&'static str>,
 }
 
-pub fn capture(
+pub(crate) fn capture(
     root: &Path,
     fixtures: &BTreeMap<String, Fixture>,
     index_url: &str,
@@ -72,7 +72,7 @@ pub fn capture(
             None => "",
         };
         let path = project.join(file);
-        fs::create_dir_all(path.parent().unwrap())?;
+        fs::create_dir_all(path.parent().expect("the path was joined onto a directory"))?;
         fs::write(&path, contents)?;
     }
 
@@ -127,7 +127,11 @@ fn run(root: &Path, project: &Path, args: &[&str], stdin: &str) -> Result<String
         .stderr(Stdio::piped())
         .spawn()
         .context("failed to run typst-updater")?;
-    child.stdin.take().unwrap().write_all(stdin.as_bytes())?;
+    child
+        .stdin
+        .take()
+        .expect("stdin is piped")
+        .write_all(stdin.as_bytes())?;
     let out = child.wait_with_output()?;
     if !out.status.success() {
         bail!(

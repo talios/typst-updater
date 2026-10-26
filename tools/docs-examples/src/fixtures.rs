@@ -11,7 +11,7 @@ use syn::{Expr, File, Item, Lit, Pat, Token};
 
 /// Everything the site can use from one `#[test]` function.
 #[derive(Serialize, Default, PartialEq, Debug)]
-pub struct Fixture {
+pub(crate) struct Fixture {
     /// String-valued `let` bindings, such as `let src = concat!(...)`, keyed by binding name.
     pub strings: BTreeMap<String, String>,
     /// String arguments of `assert_eq!`, in the order they appear.
@@ -27,7 +27,7 @@ pub struct Fixture {
 }
 
 /// Returns the fixtures of every `#[test]` function in the file's `mod tests`, keyed by test name.
-pub fn extract(file: &File) -> Result<BTreeMap<String, Fixture>> {
+pub(crate) fn extract(file: &File) -> Result<BTreeMap<String, Fixture>> {
     let Some(items) = file.items.iter().find_map(|item| match item {
         Item::Mod(m) if m.ident == "tests" => m.content.as_ref().map(|(_, items)| items),
         _ => None,
@@ -103,7 +103,7 @@ impl<'ast> Visit<'ast> for Fixture {
 }
 
 /// The value of a top-level `const NAME: &str = "..."`.
-pub fn string_const(file: &File, name: &str) -> Result<String> {
+pub(crate) fn string_const(file: &File, name: &str) -> Result<String> {
     file.items
         .iter()
         .find_map(|item| match item {

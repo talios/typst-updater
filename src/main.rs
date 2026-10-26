@@ -15,7 +15,8 @@ use walkdir::{DirEntry, WalkDir};
 const PACKAGE_INDEX_URL: &str = "https://packages.typst.org/preview/index.json";
 
 static IMPORT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"\bimport\s+"@preview/([A-Za-z0-9_-]+):([0-9]+\.[0-9]+\.[0-9]+)""#).unwrap()
+    Regex::new(r#"\bimport\s+"@preview/([A-Za-z0-9_-]+):([0-9]+\.[0-9]+\.[0-9]+)""#)
+        .expect("the import pattern is a valid regex")
 });
 
 /// Find Typst package imports and update them to their latest versions.

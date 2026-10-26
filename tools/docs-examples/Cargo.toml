@@ -5,6 +5,9 @@ edition = "2024"
 publish = false
 description = "Extracts the unit-test fixtures in src/main.rs for the documentation site"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow = "1.0.104"
 serde = { version = "1.0.229", features = ["derive"] }

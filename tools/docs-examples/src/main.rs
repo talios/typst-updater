@@ -47,8 +47,8 @@ fn run() -> Result<()> {
 
 fn write_json(root: &Path, name: &str, value: &impl Serialize) -> Result<()> {
     let path = root.join(OUTPUT_DIR).join(name);
-    fs::create_dir_all(path.parent().unwrap())?;
-    fs::write(&path, serde_json::to_string_pretty(value)? + "\n")
+    fs::create_dir_all(path.parent().expect("the path was joined onto a directory"))?;
+    fs::write(&path, format!("{}\n", serde_json::to_string_pretty(value)?))
         .with_context(|| format!("failed to write {}", path.display()))
 }
 
