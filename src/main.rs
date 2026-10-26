@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Write};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -11,6 +12,7 @@ use colored::Colorize;
 use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
+use typst_syntax::{LinkedNode, SyntaxKind};
 use walkdir::{DirEntry, WalkDir};
 
 const PACKAGE_INDEX_URL: &str = "https://packages.typst.org/preview/index.json";
@@ -33,6 +35,10 @@ struct Args {
     #[arg(short, long)]
     force: bool,
 
+    /// Also update imports in comments and raw blocks, such as the examples in a package's documentation
+    #[arg(long)]
+    include_docs: bool,
+
     /// Package index to read instead of packages.typst.org; used to generate the documentation
     #[arg(long, hide = true, default_value = PACKAGE_INDEX_URL)]
     index_url: String,
@@ -44,13 +50,22 @@ struct IndexEntry {
     version: String,
 }
 
+/// Which `import`s to look for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Scope {
+    /// Only imports that Typst evaluates.
+    Code,
+    /// Also imports inside comments and raw blocks.
+    IncludeDocs,
+}
+
 /// A single `#import "@preview/name:version"` occurrence within a file.
 struct Import {
     line: usize,
     package: String,
     current: Version,
     /// Byte range of the version text within the file contents.
-    version_span: std::ops::Range<usize>,
+    version_span: Range<usize>,
 }
 
 struct Update {
@@ -68,6 +83,11 @@ struct FileUpdates {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    let scope = if args.include_docs {
+        Scope::IncludeDocs
+    } else {
+        Scope::Code
+    };
 
     let files = find_typst_files(&args.path)?;
     if files.is_empty() {
@@ -87,7 +107,7 @@ fn main() -> Result<()> {
     for path in files {
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("failed to read {}", path.display()))?;
-        let updates = find_updates(&contents, &latest_versions);
+        let updates = find_updates(&contents, &latest_versions, scope);
         if !updates.is_empty() {
             let display = path
                 .strip_prefix(&args.path)
@@ -190,8 +210,8 @@ fn latest_versions(entries: Vec<IndexEntry>) -> HashMap<String, Version> {
 }
 
 /// Returns the imports in `contents` that have a newer version in `latest`.
-fn find_updates(contents: &str, latest: &HashMap<String, Version>) -> Vec<Update> {
-    find_imports(contents)
+fn find_updates(contents: &str, latest: &HashMap<String, Version>, scope: Scope) -> Vec<Update> {
+    find_imports(contents, scope)
         .into_iter()
         .filter_map(|import| {
             let newest = latest.get(&import.package)?;
@@ -203,11 +223,17 @@ fn find_updates(contents: &str, latest: &HashMap<String, Version>) -> Vec<Update
         .collect()
 }
 
-fn find_imports(contents: &str) -> Vec<Import> {
+fn find_imports(contents: &str, scope: Scope) -> Vec<Import> {
+    let code_imports = (scope == Scope::Code).then(|| import_ranges(contents));
     IMPORT_RE
         .captures_iter(contents)
         .filter_map(|caps| {
             let version = caps.get(2)?;
+            if let Some(ranges) = &code_imports
+                && !ranges.iter().any(|r| r.contains(&version.start()))
+            {
+                return None;
+            }
             Some(Import {
                 line: contents[..version.start()].matches('\n').count() + 1,
                 package: caps[1].to_string(),
@@ -216,6 +242,25 @@ fn find_imports(contents: &str) -> Vec<Import> {
             })
         })
         .collect()
+}
+
+/// Byte ranges of the `import` statements in `contents` that Typst evaluates, which
+/// excludes any that only appear in comments or raw blocks.
+fn import_ranges(contents: &str) -> Vec<Range<usize>> {
+    fn walk(node: &LinkedNode<'_>, ranges: &mut Vec<Range<usize>>) {
+        if node.kind() == SyntaxKind::ModuleImport {
+            ranges.push(node.range());
+            return;
+        }
+        for child in node.children() {
+            walk(&child, ranges);
+        }
+    }
+
+    let root = typst_syntax::parse(contents);
+    let mut ranges = Vec::new();
+    walk(&LinkedNode::new(&root), &mut ranges);
+    ranges
 }
 
 fn print_updates(files: &[FileUpdates]) {
@@ -345,7 +390,7 @@ mod tests {
     #[test]
     fn finds_imports_with_line_numbers() {
         let src = "#import \"@preview/cetz:0.1.0\": canvas\n\n#import \"@preview/tablex:0.0.1\"\n";
-        let imports = find_imports(src);
+        let imports = find_imports(src, Scope::Code);
         assert_eq!(imports.len(), 2);
         assert_eq!((imports[0].package.as_str(), imports[0].line), ("cetz", 1));
         assert_eq!(
@@ -358,7 +403,10 @@ mod tests {
     #[test]
     fn finds_multiline_and_code_mode_imports() {
         let src = "#import \"@preview/headstamp:0.1.0\": (\n  a, b,\n)\n#{ import \"@preview/cetz:0.1.0\" }\n";
-        let names: Vec<_> = find_imports(src).into_iter().map(|i| i.package).collect();
+        let names: Vec<_> = find_imports(src, Scope::Code)
+            .into_iter()
+            .map(|i| i.package)
+            .collect();
         assert_eq!(names, ["headstamp", "cetz"]);
     }
 
@@ -370,7 +418,30 @@ mod tests {
             "#include \"@preview/cetz:0.1.0\"\n",
             "#let s = \"@preview/cetz:0.1.0\"\n",
         );
-        assert!(find_imports(src).is_empty());
+        assert!(find_imports(src, Scope::Code).is_empty());
+    }
+
+    #[test]
+    fn skips_imports_in_comments_and_raw_blocks_unless_docs_are_included() {
+        let src = concat!(
+            "#import \"@preview/cetz:0.1.0\"\n",
+            "// #import \"@preview/commented:0.1.0\"\n",
+            "/* #import \"@preview/blocked:0.1.0\" */\n",
+            "```typ\n",
+            "#import \"@preview/example:0.1.0\"\n",
+            "```\n",
+        );
+        let names = |scope| -> Vec<_> {
+            find_imports(src, scope)
+                .into_iter()
+                .map(|i| i.package)
+                .collect()
+        };
+        assert_eq!(names(Scope::Code), ["cetz"]);
+        assert_eq!(
+            names(Scope::IncludeDocs),
+            ["cetz", "commented", "blocked", "example"]
+        );
     }
 
     #[test]
@@ -382,7 +453,7 @@ mod tests {
             "#import \"@preview/unknown:0.1.0\"\n",
         );
         let index = latest(&[("old", "0.2.0"), ("current", "1.0.0"), ("ahead", "1.0.0")]);
-        let updates = find_updates(src, &index);
+        let updates = find_updates(src, &index, Scope::Code);
         assert_eq!(updates.len(), 1);
         assert_eq!(updates[0].import.package, "old");
         assert_eq!(updates[0].latest, v("0.2.0"));
@@ -396,7 +467,7 @@ mod tests {
             "#import \"@preview/tablex:0.0.1\"\n",
         );
         let index = latest(&[("cetz", "0.10.12"), ("tablex", "0.0.9")]);
-        let out = rewrite(src, &find_updates(src, &index));
+        let out = rewrite(src, &find_updates(src, &index, Scope::Code));
         assert_eq!(
             out,
             concat!(
@@ -413,7 +484,7 @@ mod tests {
             path,
             display: "main.typ".into(),
             contents: contents.into(),
-            updates: find_updates(contents, &index),
+            updates: find_updates(contents, &index, Scope::Code),
         }
     }
 

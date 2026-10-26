@@ -124,6 +124,10 @@ const tree = fileTree("my-thesis", walk.files, walk.paths);
             <code>--force</code> skips the prompt, which suits CI jobs and scripted upgrades. Commit first so you can
             review the result with <code>git diff</code>.
           </p>
+          <p class="note">
+            Imports inside comments and raw blocks are left alone, since they are usually examples rather than code.
+            Pass <code>--include-docs</code> to update them too, for instance in a package's own documentation.
+          </p>
         </div>
       </div>
     </section>
