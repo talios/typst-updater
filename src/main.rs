@@ -162,12 +162,12 @@ fn fetch_latest_versions(url: &str) -> Result<HashMap<String, Version>> {
     let entries: Vec<IndexEntry> = agent
         .get(url)
         .call()
-        .context("failed to fetch Typst package index")?
+        .with_context(|| format!("failed to fetch Typst package index from {url}"))?
         .body_mut()
         .with_config()
         .limit(64 * 1024 * 1024)
         .read_json()
-        .context("failed to parse Typst package index")?;
+        .with_context(|| format!("failed to parse Typst package index from {url}"))?;
     Ok(latest_versions(entries))
 }
 
