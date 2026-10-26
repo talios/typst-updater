@@ -1,0 +1,75 @@
+---
+// A terminal window replaying a session captured from the real binary by tools/docs-examples.
+import type { Session } from "../lib/examples";
+
+interface Props {
+  session: Session;
+}
+
+const { session } = Astro.props;
+---
+
+<figure class="terminal">
+  <figcaption><span></span><span></span><span></span><b>{session.cwd}</b></figcaption>
+  <pre><span class="prompt">$</span> {session.command}{"\n"}{session.output.map((s) => (s.styles.length ? <span class={s.styles.join(" ")}>{s.text}</span> : s.text))}</pre>
+</figure>
+
+<style>
+  .terminal {
+    margin: 0;
+    background: var(--term-bg);
+    border-radius: var(--radius);
+    border: 1px solid #000;
+    box-shadow: 0 12px 40px -18px rgb(0 0 0 / 0.5);
+    overflow: hidden;
+    min-width: 0;
+  }
+  figcaption {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.55rem 0.8rem;
+    background: rgb(255 255 255 / 0.04);
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+  figcaption span {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #3a4247;
+  }
+  figcaption b {
+    margin-left: 0.5rem;
+    font: 500 0.75rem var(--mono);
+    color: var(--term-dim);
+  }
+  pre {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--term-text);
+    font-size: 0.85rem;
+  }
+  pre :global(.b) {
+    font-weight: 700;
+  }
+  pre :global(.dim) {
+    color: var(--term-dim);
+  }
+  pre :global(.u) {
+    text-decoration: underline;
+  }
+  pre :global(.red) {
+    color: var(--term-old);
+  }
+  pre :global(.green) {
+    color: var(--term-new);
+  }
+  pre :global(.cyan) {
+    color: var(--term-cyan);
+  }
+  .prompt {
+    color: var(--term-new);
+    user-select: none;
+  }
+</style>

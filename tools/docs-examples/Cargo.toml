@@ -1,0 +1,13 @@
+[package]
+name = "docs-examples"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Extracts the unit-test fixtures in src/main.rs for the documentation site"
+
+[dependencies]
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+syn = { version = "3.0.9", features = ["full", "visit"] }
+tempfile = "3.27.0"

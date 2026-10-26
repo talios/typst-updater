@@ -1,0 +1,109 @@
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f4;
+  --text: #1c2326;
+  --muted: #5a6670;
+  --border: #dfe3e5;
+  --accent: #1b8796;
+  --accent-soft: #e3f3f5;
+  --old: #c4352b;
+  --new: #23863a;
+  --term-bg: #15191c;
+  --term-text: #d7dde0;
+  --term-dim: #7b868d;
+  --term-old: #ff7b72;
+  --term-new: #7ee787;
+  --term-cyan: #6fd3e0;
+  --radius: 10px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101315;
+    --surface: #161a1d;
+    --surface-2: #1d2226;
+    --text: #e4e8ea;
+    --muted: #97a3aa;
+    --border: #2a3136;
+    --accent: #4fc3d2;
+    --accent-soft: #15333a;
+    --old: #ff8a80;
+    --new: #7ee787;
+    --term-bg: #0b0e10;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 var(--sans);
+}
+
+a {
+  color: var(--accent);
+}
+
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+:not(pre) > code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.05em 0.35em;
+}
+
+pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  line-height: 1.55;
+}
+
+/* Shiki dual themes: light by default, dark under the OS preference. */
+@media (prefers-color-scheme: dark) {
+  .astro-code,
+  .astro-code span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.6rem;
+  margin: 0 0 0.5rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+}
+
+p {
+  margin: 0 0 1rem;
+}

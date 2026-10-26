@@ -1,0 +1,55 @@
+---
+// One worked example, labelled with the unit test in src/main.rs it is taken from.
+interface Props {
+  title: string;
+  test: string;
+}
+
+const { title, test } = Astro.props;
+const testUrl = `https://github.com/talios/typst-updater/blob/main/src/main.rs`;
+---
+
+<article class="example">
+  <header>
+    <h3>{title}</h3>
+    <a class="test" href={testUrl} title="Unit test this example comes from"><code>{test}</code></a>
+  </header>
+  <div class="body"><slot /></div>
+</article>
+
+<style>
+  .example {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    min-width: 0;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .test {
+    font-size: 0.8rem;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .test code {
+    color: var(--muted);
+  }
+  .body :global(p) {
+    color: var(--muted);
+  }
+  .body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .body :global(pre + p),
+  .body :global(pre + pre),
+  .body :global(.table) {
+    margin-top: 0.75rem;
+  }
+</style>

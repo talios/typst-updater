@@ -1,0 +1,449 @@
+---
+import { Code } from "astro:components";
+import Base from "../layouts/Base.astro";
+import Example from "../components/Example.astro";
+import Terminal from "../components/Terminal.astro";
+import { compare, fileTree, fixture, importsIn, indexJson, isVersion, latestVersions, source, terminals } from "../lib/examples";
+
+const repo = "https://github.com/talios/typst-updater";
+
+const T = {
+  lineNumbers: "finds_imports_with_line_numbers",
+  multiline: "finds_multiline_and_code_mode_imports",
+  ignored: "ignores_non_package_and_non_preview_imports",
+  newerOnly: "find_updates_only_reports_newer_known_packages",
+  highest: "latest_versions_picks_highest_regardless_of_order",
+  unparseable: "latest_versions_skips_unparseable_versions",
+  rewrite: "rewrite_changes_only_versions_and_handles_length_changes",
+  walk: "finds_typ_files_recursively_skipping_hidden_dirs",
+};
+const themes = { light: "github-light", dark: "github-dark" };
+
+const lineNumbers = source(T.lineNumbers);
+const multiline = source(T.multiline);
+const multilineNames = importsIn(multiline).map((i) => i.name);
+const ignored = source(T.ignored);
+
+const newerOnly = source(T.newerOnly);
+const newerOnlyIndex = new Map(fixture(T.newerOnly).latest);
+const newerOnlyRows = importsIn(newerOnly).map((i) => {
+  const latest = newerOnlyIndex.get(i.name);
+  const order = latest === undefined ? undefined : compare(latest, i.version);
+  const result =
+    order === undefined ? "not in index, skipped" : order > 0 ? `update to ${latest}` : order === 0 ? "up to date" : "never downgraded";
+  return { ...i, latest, result, update: order !== undefined && order > 0 };
+});
+
+// Both latest_versions tests share the same index; show them as one index.json.
+const indexEntries = [...fixture(T.highest).entries];
+for (const entry of fixture(T.unparseable).entries) {
+  if (!indexEntries.some(([n, v]) => n === entry[0] && v === entry[1])) indexEntries.push(entry);
+}
+const semverPackage = indexEntries[0][0];
+const semverVersions = indexEntries.filter(([n, v]) => n === semverPackage && isVersion(v)).map(([, v]) => v);
+const semverHighest = latestVersions(indexEntries).get(semverPackage)!;
+const textHighest = [...semverVersions].sort().at(-1)!;
+
+const before = source(T.rewrite);
+const after = fixture(T.rewrite).expected[0].trimEnd();
+const rewriteIndex = new Map(fixture(T.rewrite).latest);
+const lengthChange = importsIn(before)
+  .map((i) => ({ from: i.version, to: rewriteIndex.get(i.name) }))
+  .find(({ from, to }) => to !== undefined && to.length !== from.length);
+
+const walk = fixture(T.walk);
+const tree = fileTree("my-thesis", walk.files, walk.paths);
+---
+
+<Base
+  title="typst-updater"
+  description="A small command-line tool that finds @preview package imports in your Typst sources and bumps them to the latest published versions."
+>
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">Command-line tool · Rust</p>
+        <h1>Keep your Typst package imports current.</h1>
+        <p class="lede">
+          <code>typst-updater</code> scans a project for <code>@preview</code> package imports, checks them against the
+          <a href="https://typst.app/universe">Typst Universe</a> package index, shows you which ones are out of date and
+          rewrites just the version numbers once you say yes.
+        </p>
+        <div class="actions">
+          <a class="button primary" href={`${repo}/releases`}>Download a release</a>
+          <a class="button" href={repo}>View on GitHub</a>
+        </div>
+      </div>
+      <Terminal session={terminals.run} />
+    </div>
+  </header>
+
+  <main>
+    <section class="wrap" id="why">
+      <h2>Why it exists</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>Versions are pinned</h3>
+          <p>
+            Typst package imports always name an exact version, such as <code>"@preview/cetz:0.1.0"</code>. Nothing
+            tells you when a newer release lands, so documents quietly fall behind.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Imports are scattered</h3>
+          <p>
+            A thesis or a set of templates can pull the same package into dozens of files. Finding and editing each
+            import by hand is tedious and easy to get wrong.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Edits stay surgical</h3>
+          <p>
+            Only the version text inside each import string is replaced. Formatting, comments and everything else in
+            the file are left exactly as they were.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="usage">
+      <h2>Usage</h2>
+      <p>Run it from the root of a Typst project, or point it somewhere else with <code>--path</code>.</p>
+      <div class="usage-grid">
+        <Terminal session={terminals.help} />
+        <div class="steps">
+          <ol>
+            <li><strong>Walk</strong> the directory for <code>.typ</code> files, skipping hidden directories such as <code>.git</code>.</li>
+            <li><strong>Fetch</strong> the package index from <code>packages.typst.org</code> and keep the highest version of each package.</li>
+            <li><strong>Compare</strong> every <code>@preview</code> import against that index.</li>
+            <li><strong>Report</strong> the available updates, grouped by file with line numbers.</li>
+            <li><strong>Rewrite</strong> the version numbers after you confirm, or straight away with <code>--force</code>.</li>
+          </ol>
+          <p class="note">
+            <code>--force</code> skips the prompt, which suits CI jobs and scripted upgrades. Commit first so you can
+            review the result with <code>git diff</code>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="examples">
+      <h2>Examples</h2>
+      <p class="section-lede">
+        Each example below is generated from a unit test in
+        <a href={`${repo}/blob/main/src/main.rs`}><code>src/main.rs</code></a>, so the behaviour shown here is the
+        behaviour the test suite checks.
+      </p>
+
+      <div class="examples">
+        <Example title="Finds imports and their line numbers" test={T.lineNumbers}>
+          <Code code={lineNumbers} lang="typst" themes={themes} />
+          <div class="table">
+            <table>
+              <thead><tr><th>Line</th><th>Package</th><th>Version</th></tr></thead>
+              <tbody>
+                {importsIn(lineNumbers).map((i) => <tr><td>{i.line}</td><td><code>{i.name}</code></td><td>{i.version}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </Example>
+
+        <Example title="Handles multi-line and code-mode imports" test={T.multiline}>
+          <Code code={multiline} lang="typst" themes={themes} />
+          <p>
+            Both {multilineNames.map((name, i) => <>{i > 0 && " and "}<code>{name}</code></>)} are found. The import
+            list can span several lines, and an <code>import</code> inside a <code>#&#123; … &#125;</code> code block
+            counts too.
+          </p>
+        </Example>
+
+        <Example title="Leaves everything else alone" test={T.ignored}>
+          <Code code={ignored} lang="typst" themes={themes} />
+          <p>
+            None of these lines match. Local files, the <code>@local</code> namespace, <code>#include</code> and plain
+            strings that only look like a package spec are all ignored.
+          </p>
+        </Example>
+
+        <Example title="Only reports real upgrades" test={T.newerOnly}>
+          <Code code={newerOnly} lang="typst" themes={themes} />
+          <div class="table">
+            <table>
+              <thead><tr><th>Import</th><th>Index</th><th>Result</th></tr></thead>
+              <tbody>
+                {newerOnlyRows.map((r) => (
+                  <tr>
+                    <td><code>{r.name}</code> {r.version}</td>
+                    <td>{r.latest ?? "—"}</td>
+                    <td class:list={{ up: r.update }}>{r.result}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Example>
+
+        <Example title="Compares versions as semver, not text" test={T.highest}>
+          <Code code={indexJson(indexEntries)} lang="json" themes={themes} />
+          <p>
+            The latest <code>{semverPackage}</code> is <strong>{semverHighest}</strong>
+            {textHighest !== semverHighest && <>: as text, <code>"{textHighest}"</code> would sort above it, but semver ordering doesn't</>}.
+            The order of entries in the index doesn't matter, and an entry that isn't a valid version is skipped
+            (<code>{T.unparseable}</code>).
+          </p>
+        </Example>
+
+        <Example title="Rewrites only the version text" test={T.rewrite}>
+          <div class="diff">
+            <div>
+              <span class="diff-label old-label">before</span>
+              <Code code={before} lang="typst" themes={themes} />
+            </div>
+            <div>
+              <span class="diff-label new-label">after</span>
+              <Code code={after} lang="typst" themes={themes} />
+            </div>
+          </div>
+          <p>
+            Comments and import lists are untouched.
+            {lengthChange && (
+              <>
+                A version that changes length, like <code>{lengthChange.from}</code> becoming
+                <code>{lengthChange.to}</code>, doesn't shift any later edits, because edits are applied from the end
+                of the file backwards.
+              </>
+            )}
+          </p>
+        </Example>
+
+        <Example title="Scans recursively, skipping hidden directories" test={T.walk}>
+          <pre class="tree">{tree}</pre>
+          <p>
+            Files are visited in name order, so they are reported as
+            {walk.paths.map((path, i) => <>{i > 0 && (i === walk.paths.length - 1 ? " then " : ", ")}<code>{path}</code></>)}.
+          </p>
+        </Example>
+      </div>
+    </section>
+
+    <section class="wrap" id="install">
+      <h2>Install</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>Prebuilt binaries</h3>
+          <p>
+            Each <a href={`${repo}/releases`}>release</a> ships archives for Linux (x86_64, aarch64), macOS (Apple
+            silicon, Intel) and Windows (x86_64). A rolling <code>snapshot</code> prerelease tracks <code>main</code>.
+          </p>
+        </div>
+        <div class="card">
+          <h3>From source</h3>
+          <Code code={`cargo install --locked \\\n  --git ${repo}`} lang="sh" themes={themes} />
+        </div>
+        <div class="card">
+          <h3>From a checkout</h3>
+          <Code code={`mise run install`} lang="sh" themes={themes} />
+          <p class="small">Runs the tests, builds a release binary and installs it into <code>~/.cargo/bin</code>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span><code>typst-updater</code> is not affiliated with Typst GmbH.</span>
+      <a href={repo}>Source on GitHub</a>
+    </div>
+  </footer>
+</Base>
+
+<style>
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+
+  .hero {
+    padding: 4rem 0 3.5rem;
+    background:
+      radial-gradient(60rem 30rem at 85% -10%, var(--accent-soft), transparent 70%),
+      var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 3rem;
+    align-items: center;
+  }
+  .eyebrow {
+    margin: 0 0 0.75rem;
+    font: 600 0.8rem var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-size: clamp(2rem, 4.5vw, 3rem);
+    margin: 0 0 1rem;
+  }
+  .lede {
+    font-size: 1.1rem;
+    color: var(--muted);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  .button {
+    display: inline-block;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
+  main section {
+    padding-top: 3.5rem;
+  }
+  .section-lede {
+    color: var(--muted);
+    max-width: 46rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    min-width: 0;
+  }
+  .card p {
+    color: var(--muted);
+    margin: 0;
+  }
+  .card .small {
+    font-size: 0.9rem;
+    margin-top: 0.6rem;
+  }
+
+  .usage-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+  .steps ol {
+    margin: 0 0 1rem;
+    padding-left: 1.3rem;
+  }
+  .steps li {
+    margin-bottom: 0.5rem;
+  }
+  .note {
+    font-size: 0.95rem;
+    color: var(--muted);
+    border-left: 3px solid var(--accent);
+    padding-left: 0.9rem;
+  }
+
+  .examples {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .table {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  td.up {
+    color: var(--new);
+    font-weight: 600;
+  }
+
+  .diff {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .diff-label {
+    display: inline-block;
+    font: 600 0.7rem var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+  .old-label {
+    color: var(--old);
+  }
+  .new-label {
+    color: var(--new);
+  }
+
+  .tree {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding: 1.5rem 0 2rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  footer .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .hero {
+      padding-top: 2.5rem;
+    }
+    .hero-grid,
+    .usage-grid,
+    .examples,
+    .cards {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .hero-grid {
+      gap: 2rem;
+    }
+  }
+</style>

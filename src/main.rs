@@ -29,6 +29,10 @@ struct Args {
     /// Apply updates without prompting
     #[arg(short, long)]
     force: bool,
+
+    /// Package index to read instead of packages.typst.org; used to generate the documentation
+    #[arg(long, hide = true, default_value = PACKAGE_INDEX_URL)]
+    index_url: String,
 }
 
 #[derive(Deserialize)]
@@ -73,8 +77,8 @@ fn main() -> Result<()> {
         args.path.display().to_string().bold()
     );
 
-    println!("Fetching package index from {}", PACKAGE_INDEX_URL.dimmed());
-    let latest_versions = fetch_latest_versions()?;
+    println!("Fetching package index from {}", args.index_url.dimmed());
+    let latest_versions = fetch_latest_versions(&args.index_url)?;
 
     let mut pending = Vec::new();
     for path in files {
@@ -143,8 +147,8 @@ fn is_hidden(entry: &DirEntry) -> bool {
 }
 
 /// Returns the highest published version of every package in the preview namespace.
-fn fetch_latest_versions() -> Result<HashMap<String, Version>> {
-    let entries: Vec<IndexEntry> = ureq::get(PACKAGE_INDEX_URL)
+fn fetch_latest_versions(url: &str) -> Result<HashMap<String, Version>> {
+    let entries: Vec<IndexEntry> = ureq::get(url)
         .call()
         .context("failed to fetch Typst package index")?
         .body_mut()

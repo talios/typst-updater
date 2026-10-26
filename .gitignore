@@ -1,1 +1,6 @@
 /target
+/docs/node_modules
+/docs/dist
+/docs/.astro
+# Generated from src/main.rs by `mise run docs:examples`
+/docs/src/data

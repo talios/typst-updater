@@ -3,6 +3,10 @@ name = "typst-updater"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+# Helpers that support the project but are never shipped; `cargo build` at the root only builds typst-updater
+members = ["tools/docs-examples"]
+
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
