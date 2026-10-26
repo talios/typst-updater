@@ -4,7 +4,7 @@
 # Provides `sbot` for deriving release and snapshot versions from git tags
 "github:restechnica/semverbot" = "1.7.2"
 # Builds the Astro documentation site in docs/
-node = "24"
+node = "26"
 
 [tasks.update]
 description = "Upgrade dependencies in Cargo.toml and refresh Cargo.lock"
