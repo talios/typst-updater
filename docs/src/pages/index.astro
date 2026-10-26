@@ -117,7 +117,9 @@ const tree = fileTree("my-thesis", walk.files, walk.paths);
             <li><strong>Walk</strong> the directory for <code>.typ</code> files, skipping hidden directories such as <code>.git</code>.</li>
             <li><strong>Fetch</strong> the package index from <code>packages.typst.org</code> and keep the highest version of each package.</li>
             <li><strong>Compare</strong> every <code>@preview</code> import against that index.</li>
-            <li><strong>Report</strong> the available updates, grouped by file with line numbers.</li>
+            <li><strong>Report</strong> the available updates, grouped by file with line numbers. Updates that may break
+              your document under semver, such as <code>0.1</code> to <code>0.2</code> or <code>1.x</code> to
+              <code>2.0</code>, are marked <em>breaking</em>.</li>
             <li><strong>Rewrite</strong> the version numbers after you confirm, or straight away with <code>--yes</code>.</li>
           </ol>
           <p class="note">

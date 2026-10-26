@@ -42,7 +42,7 @@ struct Session {
     output: Vec<Span>,
 }
 
-/// A run of output text sharing the same styles (`b`, `dim`, `u`, `red`, `green`, `cyan`).
+/// A run of output text sharing the same styles (`b`, `dim`, `u`, `red`, `green`, `yellow`, `cyan`).
 #[derive(Serialize, PartialEq, Debug)]
 struct Span {
     text: String,
@@ -206,6 +206,7 @@ fn spans(ansi: &str) -> Vec<Span> {
                 "4" => "u",
                 "31" => "red",
                 "32" => "green",
+                "33" => "yellow",
                 "36" => "cyan",
                 _ => continue,
             };

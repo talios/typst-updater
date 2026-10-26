@@ -11,7 +11,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use colored::Colorize;
 use regex::Regex;
-use semver::Version;
+use semver::{Comparator, Op, Version};
 use serde::Deserialize;
 use typst_syntax::{LinkedNode, SyntaxKind};
 use walkdir::{DirEntry, WalkDir};
@@ -265,6 +265,20 @@ fn import_ranges(contents: &str) -> Vec<Range<usize>> {
     ranges
 }
 
+/// Whether moving from `current` to `latest` may break the importing document, using
+/// Cargo's caret rules: a new major version, or a new minor (or patch) version while the
+/// major (and minor) version is still 0.
+fn is_breaking(current: &Version, latest: &Version) -> bool {
+    let compatible = Comparator {
+        op: Op::Caret,
+        major: current.major,
+        minor: Some(current.minor),
+        patch: Some(current.patch),
+        pre: current.pre.clone(),
+    };
+    !compatible.matches(latest)
+}
+
 fn print_updates(files: &[FileUpdates]) {
     let name_width = files
         .iter()
@@ -277,12 +291,17 @@ fn print_updates(files: &[FileUpdates]) {
     for file in files {
         println!("\n  {}", file.display.cyan().bold());
         for update in &file.updates {
+            let latest = update.latest.to_string();
+            let (latest, note) = if is_breaking(&update.import.current, &update.latest) {
+                (latest.yellow(), "  breaking".yellow())
+            } else {
+                (latest.green(), "".normal())
+            };
             println!(
-                "    {:>5}  {:<name_width$}  {:>8} → {}",
+                "    {:>5}  {:<name_width$}  {:>8} → {latest}{note}",
                 format!("L{}", update.import.line).dimmed(),
                 update.import.package,
                 update.import.current.to_string().red(),
-                update.latest.to_string().green(),
             );
         }
     }
@@ -478,6 +497,15 @@ mod tests {
                 "#import \"@preview/tablex:0.0.9\"\n",
             )
         );
+    }
+
+    #[test]
+    fn breaking_updates_follow_caret_rules() {
+        assert!(!is_breaking(&v("1.2.3"), &v("1.9.0")));
+        assert!(is_breaking(&v("1.2.3"), &v("2.0.0")));
+        assert!(!is_breaking(&v("0.2.0"), &v("0.2.5")));
+        assert!(is_breaking(&v("0.2.0"), &v("0.3.0")));
+        assert!(is_breaking(&v("0.0.1"), &v("0.0.2")));
     }
 
     fn pending(path: PathBuf, contents: &str) -> FileUpdates {
