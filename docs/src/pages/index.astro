@@ -118,11 +118,11 @@ const tree = fileTree("my-thesis", walk.files, walk.paths);
             <li><strong>Fetch</strong> the package index from <code>packages.typst.org</code> and keep the highest version of each package.</li>
             <li><strong>Compare</strong> every <code>@preview</code> import against that index.</li>
             <li><strong>Report</strong> the available updates, grouped by file with line numbers.</li>
-            <li><strong>Rewrite</strong> the version numbers after you confirm, or straight away with <code>--force</code>.</li>
+            <li><strong>Rewrite</strong> the version numbers after you confirm, or straight away with <code>--yes</code>.</li>
           </ol>
           <p class="note">
-            <code>--force</code> skips the prompt, which suits CI jobs and scripted upgrades. Commit first so you can
-            review the result with <code>git diff</code>.
+            <code>--yes</code> (or its older name <code>--force</code>) skips the prompt, which suits CI jobs and
+            scripted upgrades. Commit first so you can review the result with <code>git diff</code>.
           </p>
           <p class="note">
             Imports inside comments and raw blocks are left alone, since they are usually examples rather than code.

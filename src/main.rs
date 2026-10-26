@@ -33,8 +33,8 @@ struct Args {
     path: PathBuf,
 
     /// Apply updates without prompting
-    #[arg(short, long)]
-    force: bool,
+    #[arg(short, long, visible_alias = "force", short_alias = 'f')]
+    yes: bool,
 
     /// Also update imports in comments and raw blocks, such as the examples in a package's documentation
     #[arg(long)]
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
     print_updates(&pending);
 
     let total: usize = pending.iter().map(|f| f.updates.len()).sum();
-    if !args.force && !confirm(&format!("Apply {total} update(s)?"))? {
+    if !args.yes && !confirm(&format!("Apply {total} update(s)?"))? {
         println!("No changes made.");
         return Ok(());
     }
