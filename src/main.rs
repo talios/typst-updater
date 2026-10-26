@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::ops::Range;
@@ -197,14 +198,15 @@ fn latest_versions(entries: Vec<IndexEntry>) -> HashMap<String, Version> {
         let Ok(version) = Version::parse(&entry.version) else {
             continue;
         };
-        latest
-            .entry(entry.name)
-            .and_modify(|v| {
-                if version > *v {
-                    *v = version.clone();
-                }
-            })
-            .or_insert(version);
+        match latest.entry(entry.name) {
+            Entry::Occupied(mut e) if version > *e.get() => {
+                e.insert(version);
+            }
+            Entry::Occupied(_) => {}
+            Entry::Vacant(e) => {
+                e.insert(version);
+            }
+        }
     }
     latest
 }
